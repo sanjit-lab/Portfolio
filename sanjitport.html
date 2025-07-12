@@ -1,0 +1,372 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanjit Yadav | Geospatial Portfolio</title>
+  <!-- Leaflet core -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet.draw -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <!-- Turf.js for spatial calculations -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('sky.png') no-repeat center center fixed;
+      background-size: cover;
+      color: #333;
+      line-height: 1.6;
+      position: relative;
+      min-height: 100vh;
+    }
+    /* Overlay for readability */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.75); /* White overlay, 75% opacity */
+      z-index: -1;
+      pointer-events: none;
+    }
+    header { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c); color: #fff; padding: 2rem 0; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+    nav { margin-top: 1rem; display: flex; justify-content: center; flex-wrap: wrap; }
+    nav a { color: #fff; margin: 0.5rem 1rem; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; transition: all 0.3s ease; }
+    nav a:hover { background: rgba(255, 255, 255, 0.2); }
+    section { padding: 2rem; max-width: 1200px; margin: auto; }
+    h2 { font-size: 2rem; margin-bottom: 1.5rem; color: #1a2a6c; position: relative; padding-bottom: 0.5rem; }
+    h2::after { content: ''; position: absolute; bottom: 0; left: 0; width: 80px; height: 4px; background: linear-gradient(to right, #1a2a6c, #b21f1f); border-radius: 2px; }
+    .projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+    .card { background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s ease; border-left: 4px solid #1a2a6c; }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+    footer { text-align: center; padding: 2rem; background-color: #333; color: #fff; margin-top: 2rem; }
+    .about-container { display: flex; align-items: center; flex-wrap: wrap; gap: 2rem; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .about-container img { width: 180px; height: 180px; border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.2); object-fit: cover; border: 4px solid #1a2a6c; }
+    .skills-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .skill-item { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.1); text-align: center; font-weight: bold; color: #1a2a6c; }
+    .contact-info { background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .contact-info p { margin: 1rem 0; display: flex; align-items: center; }
+    .contact-info i { width: 30px; color: #1a2a6c; }
+    .spatial-tools { margin: 2rem 0; }
+    .tools-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+    .tool-card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .tool-header { background: #1a2a6c; color: #fff; padding: 1rem; font-weight: bold; }
+    .tool-content { padding: 1.5rem; }
+    #map { height: 300px; border-radius: 8px; margin-top: 1rem; }
+    .tool-controls { display: flex; flex-direction: column; gap: 1rem; }
+    .input-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    input, button, select { padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+    button { background: #1a2a6c; color: #fff; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s ease; }
+    button:hover { background: #b21f1f; }
+    .result { margin-top: 1rem; padding: 1rem; background: #f8f8f8; border-radius: 4px; font-weight: bold; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sanjit Yadav</h1>
+    <p>Geomatic Engineering Student | Geospatial Developer</p>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#skills">Skills</a>
+      <a href="#projects">Projects</a>
+      <a href="#tools">Spatial Tools</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <section id="about">
+    <h2>About Me</h2>
+    <div class="about-container">
+      <img src="Screenshot 2025-06-28 001426.png" alt="Sanjit Yadav">
+      <div>
+        <p>
+          I'm a passionate geomatic engineering student specializing in geospatial technologies. 
+          With expertise in GIS, remote sensing, and web development, I create innovative solutions 
+          that bridge geospatial science with modern technology.
+        </p>
+        <p style="margin-top: 1rem;">
+          Currently mastering advanced spatial analysis techniques and developing interactive 
+          geospatial applications using Python, JavaScript, and cloud-based platforms.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="skills">
+    <h2>Skills</h2>
+    <div class="skills-list">
+      <div class="skill-item">GIS Analysis</div>
+      <div class="skill-item">Remote Sensing</div>
+      <div class="skill-item">Python</div>
+      <div class="skill-item">JavaScript</div>
+      <div class="skill-item">Web Development</div>
+      <div class="skill-item">QGIS/ArcGIS</div>
+      <div class="skill-item">ENVI5</div>
+      <div class="skill-item">Google Earth Engine</div>
+    </div>
+  </section>
+
+  <section id="projects">
+    <h2>Projects</h2>
+    <div class="projects">
+      <div class="card">
+        <h3>Land Use/Land Cover Mapping</h3>
+        <p>Created high-resolution LULC maps using Sentinel-2 imagery and machine learning techniques.</p>
+      </div>
+      <div class="card">
+        <h3>Web GIS Application</h3>
+        <p>Developed an interactive web-based GIS platform for spatial data visualization and analysis.</p>
+      </div>
+      <div class="card">
+        <h3>Urban Change Detection</h3>
+        <p>Analyzed urban expansion patterns using multi-temporal satellite imagery and GIS techniques.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tools">
+    <h2>Spatial Tools</h2>
+    <div class="tools-container">
+      <!-- Interactive Map Tool -->
+      <div class="tool-card">
+        <div class="tool-header">Interactive Map</div>
+        <div class="tool-content">
+          <p>Explore and mark locations on the interactive map:</p>
+          <div id="map"></div>
+          <div class="tool-controls">
+            <button id="add-marker">Add Marker</button>
+            <button id="clear-markers">Clear Markers</button>
+          </div>
+        </div>
+      </div>
+      <!-- Coordinate Converter -->
+      <div class="tool-card">
+        <div class="tool-header">Coordinate Converter</div>
+        <div class="tool-content">
+          <div class="input-group">
+            <label>Latitude:</label>
+            <input type="number" id="latitude" placeholder="Enter latitude" step="any">
+          </div>
+          <div class="input-group">
+            <label>Longitude:</label>
+            <input type="number" id="longitude" placeholder="Enter longitude" step="any">
+          </div>
+          <button id="convert-coords">Convert Coordinates</button>
+          <div class="result" id="conversion-result">Results will appear here</div>
+        </div>
+      </div>
+      <!-- Distance Measurement -->
+      <div class="tool-card">
+        <div class="tool-header">Distance Measurement</div>
+        <div class="tool-content">
+          <div class="input-group">
+            <label>Point 1 (lat, lon):</label>
+            <input type="text" id="point1" placeholder="e.g., 27.7172, 85.3240">
+          </div>
+          <div class="input-group">
+            <label>Point 2 (lat, lon):</label>
+            <input type="text" id="point2" placeholder="e.g., 28.2096, 83.9856">
+          </div>
+          <button id="calculate-distance">Calculate Distance</button>
+          <div class="result" id="distance-result">Distance will appear here</div>
+        </div>
+      </div>
+      <!-- Area Measurement -->
+      <div class="tool-card">
+        <div class="tool-header">Area Measurement</div>
+        <div class="tool-content">
+          <p>Draw a polygon on the map to measure area:</p>
+          <div class="result" id="area-result">Draw a polygon to see area</div>
+        </div>
+      </div>
+      <!-- Buffer Generator -->
+      <div class="tool-card">
+        <div class="tool-header">Buffer Generator</div>
+        <div class="tool-content">
+          <div class="input-group">
+            <label>Buffer Radius (meters):</label>
+            <input type="number" id="buffer-radius" value="500" min="1">
+          </div>
+          <button id="create-buffer">Create Buffer Around Last Polygon</button>
+          <div class="result" id="buffer-result">Buffer info will appear here</div>
+        </div>
+      </div>
+      <!-- Elevation Query -->
+      <div class="tool-card">
+        <div class="tool-header">Elevation Query</div>
+        <div class="tool-content">
+          <p>Click on the map to get elevation:</p>
+          <div class="result" id="elevation-result">Elevation will appear here</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <h2>Contact</h2>
+    <div class="contact-info">
+      <p><i class="fas fa-phone"></i> Phone: +977 9817378816</p>
+      <p><i class="fas fa-envelope"></i> Email: sanjity638@gmail.com</p>
+      <p><i class="fab fa-github"></i> GitHub: <a href="https://github.com/sanjit" target="_blank">github.com/sanjit</a></p>
+      <p><i class="fab fa-linkedin"></i> LinkedIn: <a href="https://linkedin.com/in/sanjit" target="_blank">linkedin.com/in/sanjit</a></p>
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 Sanjit Yadav. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // --- Basemap Layers ---
+    const baseLayers = {
+      "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }),
+      "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' })
+    };
+
+    // --- Initialize Map ---
+    const map = L.map('map', {
+      center: [27.7172, 85.3240],
+      zoom: 12,
+      layers: [baseLayers["OpenStreetMap"]]
+    });
+    L.control.layers(baseLayers).addTo(map);
+
+    let markers = [];
+
+    // --- Marker Controls ---
+    document.getElementById('add-marker').addEventListener('click', function() {
+      const marker = L.marker(map.getCenter()).addTo(map);
+      marker.bindPopup(`Location: ${map.getCenter().lat.toFixed(4)}, ${map.getCenter().lng.toFixed(4)}`).openPopup();
+      markers.push(marker);
+    });
+
+    document.getElementById('clear-markers').addEventListener('click', function() {
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+    });
+
+    // --- Coordinate Converter ---
+    document.getElementById('convert-coords').addEventListener('click', function() {
+      const lat = parseFloat(document.getElementById('latitude').value);
+      const lon = parseFloat(document.getElementById('longitude').value);
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        const dmsLat = convertToDMS(lat, true);
+        const dmsLon = convertToDMS(lon, false);
+        document.getElementById('conversion-result').innerHTML = `
+          <div>Decimal: ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
+          <div>DMS: ${dmsLat}, ${dmsLon}</div>
+          <div>UTM: ${convertToUTM(lat, lon)}</div>
+        `;
+      } else {
+        document.getElementById('conversion-result').innerHTML = "Please enter valid coordinates";
+      }
+    });
+
+    // --- Distance Measurement ---
+    document.getElementById('calculate-distance').addEventListener('click', function() {
+      const point1 = document.getElementById('point1').value.split(',').map(Number);
+      const point2 = document.getElementById('point2').value.split(',').map(Number);
+
+      if (point1.length === 2 && point2.length === 2 && 
+          !isNaN(point1[0]) && !isNaN(point1[1]) && 
+          !isNaN(point2[0]) && !isNaN(point2[1])) {
+        const distance = calculateDistance(point1[0], point1[1], point2[0], point2[1]);
+        document.getElementById('distance-result').innerHTML = `Distance: ${distance.toFixed(2)} km`;
+      } else {
+        document.getElementById('distance-result').innerHTML = "Please enter valid coordinates for both points";
+      }
+    });
+
+    // --- Helper Functions ---
+    function convertToDMS(coord, isLat) {
+      const absCoord = Math.abs(coord);
+      const deg = Math.floor(absCoord);
+      const min = Math.floor((absCoord - deg) * 60);
+      const sec = ((absCoord - deg - min/60) * 3600).toFixed(2);
+      const direction = isLat ? (coord >= 0 ? 'N' : 'S') : (coord >= 0 ? 'E' : 'W');
+      return `${deg}°${min}'${sec}"${direction}`;
+    }
+
+    function convertToUTM(lat, lon) {
+      const zone = Math.floor((lon + 180) / 6) + 1;
+      return `Zone ${zone}${lat >= 0 ? 'N' : 'S'}`;
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = deg2rad(lat2 - lat1);
+      const dLon = deg2rad(lon2 - lon1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+    function deg2rad(deg) { return deg * (Math.PI/180); }
+
+    // --- Area Measurement & Buffer Generator ---
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    const drawControl = new L.Control.Draw({
+      edit: { featureGroup: drawnItems },
+      draw: { polygon: true, polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false }
+    });
+    map.addControl(drawControl);
+
+    let lastPolygon = null;
+    map.on(L.Draw.Event.CREATED, function (e) {
+      drawnItems.clearLayers();
+      const layer = e.layer;
+      drawnItems.addLayer(layer);
+
+      if (e.layerType === 'polygon') {
+        lastPolygon = layer;
+        // Area calculation
+        const geojson = layer.toGeoJSON();
+        const area = turf.area(geojson);
+        const areaHectares = (area / 10000).toFixed(2);
+        document.getElementById('area-result').innerHTML = 
+          `Area: ${area.toFixed(2)} m² (${areaHectares} ha)`;
+      }
+    });
+
+    document.getElementById('create-buffer').addEventListener('click', function() {
+      if (!lastPolygon) {
+        document.getElementById('buffer-result').innerHTML = "Draw a polygon first!";
+        return;
+      }
+      const radius = parseFloat(document.getElementById('buffer-radius').value);
+      const geojson = lastPolygon.toGeoJSON();
+      const buffered = turf.buffer(geojson, radius, { units: 'meters' });
+
+      // Remove previous buffer if any
+      if (window.bufferLayer) map.removeLayer(window.bufferLayer);
+      window.bufferLayer = L.geoJSON(buffered, { color: 'red', fillOpacity: 0.2 }).addTo(map);
+
+      document.getElementById('buffer-result').innerHTML = `Buffer of ${radius} meters created.`;
+    });
+
+    // --- Elevation Query ---
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`)
+        .then(response => response.json())
+        .then(data => {
+          const elevation = data.results[0].elevation;
+          document.getElementById('elevation-result').innerHTML = 
+            `Elevation at (${lat.toFixed(4)}, ${lon.toFixed(4)}): ${elevation} meters`;
+        })
+        .catch(() => {
+          document.getElementById('elevation-result').innerHTML = "Elevation data not available.";
+        });
+    });
+  </script>
+</body>
+</html>
+ 
